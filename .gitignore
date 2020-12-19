@@ -34,3 +34,6 @@
 #folders
 /build
 /images
+
+#visual studio
+/.vscode
