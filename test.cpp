@@ -7,6 +7,7 @@
 // using namespace cv;
 using namespace std;
 using namespace std::chrono;
+#define MAX_SINGLE_COST 256;
 void showImage(const cv::Mat &image, std::string windowName)
 {
     cv::namedWindow(windowName, cv::WINDOW_AUTOSIZE);
@@ -56,11 +57,11 @@ int main(int argc, char **argv)
     cv::Mat image1, image2, gray1, gray2;
     image1 = cv::imread(argv[1]);
     image2 = cv::imread(argv[2]);
-    int imageWidth = image1.size[0];
-    int imageHeight = image1.size[1];
+    int columns = image1.cols;
+    int rows = image1.rows;
     assert(image1.size == image2.size); //kasnije jos dodati malo teksta
     int d_min = 0;
-    int d_max = 3;
+    int d_max = 10;
     int window = 3;
 
     cv::cvtColor(image1, gray1, cv::COLOR_BGR2GRAY);
@@ -93,7 +94,7 @@ int main(int argc, char **argv)
     // cout << "ROI(numpy" << endl;
     // cout << cv::format(roi, cv::Formatter::FMT_NUMPY) << endl;
 
-    int dimensions[3] = {imageHeight, imageWidth, d_max - d_min}; //ovdje cu spremati rezultate operacija po disparitetima
+    // int dimensions[3] = {imageHeight, imageWidth, d_max - d_min}; //ovdje cu spremati rezultate operacija po disparitetima
     // cv::Mat results(3, dimensions, CV_32SC1, cv::Scalar(0));
     // cout << results.at<int>(3, 4, 5) << endl;
 
@@ -107,15 +108,15 @@ int main(int argc, char **argv)
 
     for (int disparity = d_min; disparity <= d_max; disparity++)
     {
-        unique_ptr<cv::Mat> current(new cv::Mat(imageHeight, imageWidth, CV_8UC1));
+        unique_ptr<cv::Mat> current(new cv::Mat(rows, columns, CV_8UC1));
 
-        for (int i = 0; i < imageWidth; ++i)
+        for (int i = 0; i < rows; ++i)
         {
             //PAZI: OVO JE REDAK --> Y-KOORDINATA
             p1 = gray1.ptr<uchar>(i);
             p2 = gray2.ptr<uchar>(i);
             p3 = current->ptr<uchar>(i);
-            for (int j = 0; j < imageHeight; ++j)
+            for (int j = 0; j < columns; ++j)
             {
                 //X KOORDINATA
                 if (j < disparity)
@@ -127,6 +128,7 @@ int main(int argc, char **argv)
                     auto firstIntensity = p1[j];
                     auto secondIntensity = p2[j - disparity];
                     p3[j] = ADlookUpTable[(int)firstIntensity][(int)secondIntensity];
+                    // p3[j] = absoluteDifference((int)firstIntensity, (int)secondIntensity);
                     // results.at<int>(i, j, disparity) = absoluteDifference((int)firstIntensity, (int)secondIntensity);
                 }
                 count++;
@@ -142,6 +144,7 @@ int main(int argc, char **argv)
     cout << "Total time taken (with init): look-up table " << (duration.count() + tableInit.count()) * 1e-6 << " seconds" << endl;
 
     cout << "count: " << count << " size: " << gray1.rows * gray1.cols * (d_max - d_min + 1) << endl;
+    //-------------------------------------------------------------------------------------------------------------------------------
     // cout << results.at<int>(374, 449, 2) << endl
     // cout << results.at<int>(3, 4, 0) << endl;
     // cout << test.at<int>(150, 200) << endl;
@@ -153,17 +156,67 @@ int main(int argc, char **argv)
     // cout << "gray2(450, 375): " << (int)gray2.ptr<uchar>(374)[449] << endl;
     // cout << "results(450, 375):" << (int)results.at(0)->ptr<uchar>(374)[449] << endl;
 
-    cout << "gray1(150, 300): " << (int)gray1.ptr<uchar>(150)[300] << endl;
-    cout << "gray2(150, 298): " << (int)gray2.ptr<uchar>(150)[298] << endl;
-    cout << "results(450, 375):" << (int)results.at(2)->ptr<uchar>(150)[300] << endl;
+    // cout << "gray1(150, 300): " << (int)gray1.ptr<uchar>(150)[300] << endl;
+    // cout << "gray2(150, 298): " << (int)gray2.ptr<uchar>(150)[298] << endl;
+    // cout << "results(450, 375):" << (int)results.at(2)->ptr<uchar>(150)[300] << endl;
+    cout << "Size: " << results.size() << endl;
+
     // cout << results.size() << endl;
     // cout << "result(450, 375):" << (int)results.at<int>(374, 449, 100) << endl; //(red, stupac, disparity)
+    int disparityRange = d_max - d_min + 1;
 
-    // for(int disparity = d_min; disparity <= d_max; disparity++) {
+    cv::Mat outputMap = cv::Mat::zeros(rows, columns, CV_8UC1);
+    window = 3;
+    uchar *pOutput;
+    int minIndex, currentCost, leftCost, rightCost;
+    start = high_resolution_clock::now();
+    for (int row = window; row < rows - window; row++)
+    {
+        p1 = gray1.ptr<uchar>(row);
+        p2 = gray2.ptr<uchar>(row);
+        pOutput = outputMap.ptr<uchar>(row);
+        for (int column = window; column < columns - window; column++)
+        {
+            int min_cost = window * window * MAX_SINGLE_COST + 1;
+            
+            for (int i = 0; i < disparityRange; i++)
+            {
+                cv::Mat leftColumn(*results.at(i), cv::Range(row, row + window), cv::Range(column, column + 1));
+                cv::Mat rightColumn(*results.at(i), cv::Range(row, row + window), cv::Range(column + window - 1, column + window));
+                leftCost = (int)cv::sum(leftColumn)[0];
+                rightCost = (int)cv::sum(rightColumn)[0];
+                if (column == 0)
+                {
+                    //onda zelim inicijalizirati trenutni prozor i oznaciti lijevi i desni rub --> vec ih imam
+                    //lijevi i desni stupac imam vec, samo me zanima sto je izmedu (da ne racunam dvaput)
+                    cv::Mat middle(*results.at(i), cv::Range(row, row + window), cv::Range(1, window - 1));
+                    currentCost = (int)cv::sum(middle)[0] + leftCost + rightCost;
+                }
+                else
+                {
+                    //inace dodaj cost od stupca koji je sad "dosao" - desni, a na kraju micem lijevi cost
+                    currentCost += rightCost;
+                }
+                if (currentCost < min_cost)
+                {
+                    min_cost = currentCost;
+                    minIndex = i;
+                }
+                currentCost -= leftCost;
+            }
+            int disparity = d_min + minIndex;
+            pOutput[column] = disparity;
+        }
+    }
+    stop = high_resolution_clock::now();
+    duration = duration_cast<microseconds>(stop - start);
+    cout << "Total time taken to generate window cost and estimate output map: " << duration.count() * 1e-6 << " seconds" << endl;
 
-    // }
+    showImage(gray1, "gray1");
+    showImage(gray2, "gray2");
 
+    showImage(outputMap, "output");
     // showImage(gray1, "gray1");
     // showImage(gray2, "gray2");
-    // destroyWindows();
+    destroyWindows();
 }
