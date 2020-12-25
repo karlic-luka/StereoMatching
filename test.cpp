@@ -3,6 +3,8 @@
 #include <iostream>
 #include <chrono>
 #include <vector>
+#include <getopt.h>
+#include <boost/program_options.hpp>
 
 // using namespace cv;
 using namespace std;
@@ -19,7 +21,6 @@ void destroyWindows()
     cv::waitKey(0);
     cv::destroyAllWindows();
 }
-
 // int absoluteDifference(const int &number1, const int &number2)
 // {
 //     return number1 >= number2 ? (number1 - number2) : (number2 - number1);
@@ -29,25 +30,65 @@ int ADlookUpTable[256][256];                                                    
 
 int main(int argc, char **argv)
 {
-    if (argc != 3)
+    // if (argc != 3)
+    // {
+    //     printf("usage: DisplayImage.out <Image1_Path> <Image2_Path> d_min d_max\n");
+    //     return -1;
+    //
+    const string keys =
+        "{help h usage ? | | print this message}"
+        "{left l |<none>| path to left image}"
+        "{right r |<none> | path to right image}"
+        "{d_min | 0 | minimum disparity to evaluate}"
+        "{d_max |255| maximum disparity to evaluate}"
+        "{window w | 1 | radius of a square window}"
+        "{cost c | AD | Cost function. Only AD and Census available.}";
+
+    cv::CommandLineParser parser(argc, argv, keys);
+    if (parser.has("help"))
     {
-        printf("usage: DisplayImage.out <Image1_Path> <Image2_Path> d_min d_max\n"); //trenutno cu ih sam napisati u mainu, kasnije cu parsirati preko komandne linije
+        parser.printMessage();
+        return 0;
+    }
+    string left = parser.get<string>("left");
+    string right = parser.get<string>("right");
+    int d_min = parser.get<int>("d_min");
+    int d_max = parser.get<int>("d_max");
+    int radius = parser.get<int>("window");
+    int window = 2 * radius + 1;
+    string cost = parser.get<string>("cost");
+
+    if (!parser.check())
+    {
+        parser.printErrors();
+        return 0;
+    }
+    if (d_min > d_max)
+    {
+        cout << "You provided minimum disparity larger than maximum disparity. Please try again." << endl;
         return -1;
     }
+    if(d_min <0 || d_max <0 || radius < 0) {
+        cout << "Some of your parameters were negative integers. Please provide only positives." << endl;
+        return -1;
+    }
+    if(d_max - d_min >= 120) {
+        cout << "Wow. That's pretty large range for disparity. Please wait. It shouldn't take more than 30 seconds." << endl;
+    }
+    // cout << "Parameters: " << left << " " << right << " " << d_min << " " << d_max << " " << radius << " " << window << " " << cost << endl;
+    //-----------------------------------------------------------------------------
+    
     cv::Mat image1, image2, gray1, gray2;
-    image1 = cv::imread(argv[1]);
-    image2 = cv::imread(argv[2]);
+    image1 = cv::imread(left);
+    image2 = cv::imread(right);
     int columns = image1.cols;
     int rows = image1.rows;
-    assert(image1.size == image2.size); //kasnije jos dodati malo teksta
-    int d_min = 10;
-    int d_max = 150;
-    int radius = 4;
-    int window = 2 * radius + 1;
+    // assert(image1.size == image2.size); //kasnije jos dodati malo teksta
+    // int d_min = 0, d_max = 255, radius = 2;
 
     cv::cvtColor(image1, gray1, cv::COLOR_BGR2GRAY);
     cv::cvtColor(image2, gray2, cv::COLOR_BGR2GRAY);
-    assert(gray1.channels() == gray2.channels() == 1);
+    // assert(gray1.channels() == gray2.channels() == 1);
 
     if (!image1.data || !image2.data)
     {
@@ -67,7 +108,7 @@ int main(int argc, char **argv)
     auto stop = high_resolution_clock::now();
     auto duration = duration_cast<microseconds>(stop - start);
     auto tableInit = duration;
-    cout << "Look-up-table init: " << duration.count() << " microseconds." << endl;
+    // cout << "Look-up-table init: " << duration.count() << " microseconds." << endl;
     //---------------------------------------------------------------------------------
     // cv::Mat roi(image1, cv::Range(50, 52), cv::Range(10, 15)); //range of interest
     // cout << "ROI(numpy" << endl;
@@ -115,11 +156,11 @@ int main(int argc, char **argv)
     stop = high_resolution_clock::now();
     duration = duration_cast<microseconds>(stop - start);
 
-    cout << "Average time taken: look-up-table "
-         << duration.count() * 1e-6 / (d_max - d_min) << " seconds" << endl;
-    cout << "Total time taken (with init): look-up table " << (duration.count() + tableInit.count()) * 1e-6 << " seconds" << endl;
+    // cout << "Average time taken: look-up-table "
+    //      << duration.count() * 1e-6 / (d_max - d_min) << " seconds" << endl;
+    // cout << "Total time taken (with init): look-up table " << (duration.count() + tableInit.count()) * 1e-6 << " seconds" << endl;
 
-    cout << "count: " << count << " size: " << gray1.rows * gray1.cols * (d_max - d_min + 1) << endl;
+    // cout << "count: " << count << " size: " << gray1.rows * gray1.cols * (d_max - d_min + 1) << endl;
     //-------------------------------------------------------------------------------------------------------------------------------
     // cout << results.at<int>(374, 449, 2) << endl
     // cout << results.at<int>(3, 4, 0) << endl;
@@ -135,7 +176,7 @@ int main(int argc, char **argv)
     // cout << "gray1(150, 300): " << (int)gray1.ptr<uchar>(150)[300] << endl;
     // cout << "gray2(150, 298): " << (int)gray2.ptr<uchar>(150)[298] << endl;
     // cout << "results(450, 375):" << (int)results.at(2)->ptr<uchar>(150)[300] << endl;
-    cout << "Size: " << results.size() << endl;
+    // cout << "Size: " << results.size() << endl;
 
     // cout << results.size() << endl;
     // cout << "result(450, 375):" << (int)results.at<int>(374, 449, 100) << endl; //(red, stupac, disparity)
@@ -152,10 +193,15 @@ int main(int argc, char **argv)
         pOutput = outputMap.ptr<uchar>(row - radius);
         for (int column = radius; column < columns + radius - 1; column++)
         {
-            int min_cost = window * window * MAX_SINGLE_COST + 1;
+            int min_cost = window * window * MAX_SINGLE_COST;
 
             for (int i = 0; i < disparityRange; i++)
             {
+                if (column - radius < d_min + i)
+                {
+                    // pOutput[column - radius] = p1[column - radius];
+                    continue;
+                }
                 cv::Mat leftColumn(*results.at(i), cv::Range(row - radius, row + radius + 1), cv::Range(column - radius, column - radius + 1 + 1)); //+1+1 da se skuzi o cemu se radi
                 cv::Mat rightColumn(*results.at(i), cv::Range(row - radius, row + radius + 1), cv::Range(column + radius, column + radius + 1 + 1));
                 leftCost = (int)cv::sum(leftColumn)[0];
@@ -189,9 +235,10 @@ int main(int argc, char **argv)
 
     // showImage(gray1, "gray1");
     // showImage(gray2, "gray2");
-    
+
     showImage(gray1, "gray1");
     showImage(gray2, "gray2");
     showImage(outputMap, "output");
     destroyWindows();
+    return 0;
 }
