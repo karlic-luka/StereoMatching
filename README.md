@@ -87,3 +87,5 @@ d.3) ./stereo-matching -left=../images/venus/im0.ppm -right=../images/venus/im5.
 ```
 Almost all outputs from upper program calls are stored in StereoMatching/images/my-outputs.
 It is good to mention that my program is not parallelized using OpenCV and it is ran on CPU.
+
+P.S. Maybe my outputs would "look" better if I somehow scaled final pixel intensities, we can get brighter shades. I didn't do anything regarding that, I just stored disparity that gave minimum.
