@@ -3,7 +3,7 @@
 
 using namespace std;
 using namespace std::chrono;
-#define MAX_SINGLE_COST 256;
+#define MAX_SINGLE_COST 257;
 
 AbsoluteDifferenceCost::AbsoluteDifferenceCost() : Cost()
 {
@@ -48,7 +48,7 @@ int CensusCost::process(const int &x, const int &y) const
 }
 int CensusCost::apply(const int &x, const int &y) const
 {
-    return censusLookUpTable[x][y];
+    return this->censusLookUpTable[x][y];
 }
 void showImage(const cv::Mat &image, std::string windowName)
 {
@@ -58,21 +58,24 @@ void showImage(const cv::Mat &image, std::string windowName)
 StereoMatching::StereoMatching(std::string &left, std::string &right, int &d_min, int &d_max,
                                int &radius, Cost &cost) : d_min(d_min), d_max(d_max), radius(radius), cost(cost)
 {
-    cv::Mat image1 = cv::imread(left);
-    cv::Mat image2 = cv::imread(right);
-    cv::cvtColor(image1, gray1, cv::COLOR_BGR2GRAY);
-    cv::cvtColor(image2, gray2, cv::COLOR_BGR2GRAY);
+    gray1 = cv::imread(left);
+    gray2 = cv::imread(right);
+    cv::cvtColor(gray1, gray1, cv::COLOR_BGR2GRAY);
+    cv::cvtColor(gray2, gray2, cv::COLOR_BGR2GRAY);
+    window = 2 * radius + 1;
+    disparityRange = this->d_max - this->d_min + 1;
+    columns = gray1.cols;
+    rows = gray1.rows;
+    outputMap = cv::Mat::zeros(rows, columns, CV_8UC1);
+}
+void StereoMatching::preprocessImages()
+{
     if (needCensusTransform)
     {
         gray1 = censusTransform(gray1, 3);
         gray2 = censusTransform(gray2, 3);
+        // cout << "tu sam" << endl;
     }
-    window = 2 * radius + 1;
-    disparityRange = this->d_max - this->d_min + 1;
-    columns = gray1.cols;
-    rows = gray2.rows;
-
-    outputMap = cv::Mat::zeros(rows, columns, CV_8UC1);
 }
 void StereoMatching::prepareCostPerDisparity()
 {
@@ -85,13 +88,12 @@ void StereoMatching::prepareCostPerDisparity()
             //PAZI: OVO JE REDAK --> Y-KOORDINATA
             p1 = gray1.ptr<uchar>(i);
             p2 = gray2.ptr<uchar>(i);
-            //+radius jer zelim dodati padding na svaku stranu
-            p3 = current->ptr<uchar>(i + radius);
+            p3 = current->ptr<uchar>(i + radius); //+radius=padding
             for (int j = 0; j < columns; ++j)
             {
                 //X KOORDINATA
                 if (j < disparity)
-                    p3[j + radius] = p1[j]; //+radius jer zelim dodati padding na svaku stranu
+                    p3[j + radius] = p1[j]; //+radius = padding
                 else
                 {
                     auto firstIntensity = p1[j];
@@ -112,43 +114,49 @@ void destroyWindows()
 void StereoMatching::rollingWindowCost()
 {
     uchar *pOutput;
-    int minIndex, currentCost, leftCost, rightCost;
     for (int row = radius; row < rows + radius; row++)
     {
         pOutput = outputMap.ptr<uchar>(row - radius);
-        for (int column = radius; column < columns + radius - 1; column++)
+        for (int column = radius; column < columns + radius; column++)
         {
-            int min_cost = window * window * MAX_SINGLE_COST;
+            int minCost = window * window * MAX_SINGLE_COST;
+            int currentCost, leftCost, rightCost;
+            int minIndex = 0;
+            //cache costs because of overlapping windows
+            vector<int> previousCosts(disparityRange, 0);
 
             for (int i = 0; i < disparityRange; i++)
             {
-                if (column - radius < d_min + i)
-                {
-                    // pOutput[column - radius] = p1[column - radius];
-                    continue;
-                }
-                cv::Mat leftColumn(*results.at(i), cv::Range(row - radius, row + radius + 1), cv::Range(column - radius, column - radius + 1 + 1)); //+1+1 da se skuzi o cemu se radi
-                cv::Mat rightColumn(*results.at(i), cv::Range(row - radius, row + radius + 1), cv::Range(column + radius, column + radius + 1 + 1));
+                currentCost = previousCosts.at(i);
+                if (column - radius < d_min + i) //x_l < disparity
+                    break;
+                cv::Mat leftColumn(*(results.at(i)), cv::Range(row - radius, row + radius + 1), cv::Range(column - radius, column - radius + 1)); //+1+1 bc [..>
+                cv::Mat rightColumn(*(results.at(i)), cv::Range(row - radius, row + radius + 1), cv::Range(column + radius, column + radius + 1));
                 leftCost = (int)cv::sum(leftColumn)[0];
                 rightCost = (int)cv::sum(rightColumn)[0];
-                if (column == radius) //bilo bi inace 0, al padding
+                if (column == radius) //if I am in a new row
                 {
-                    //onda zelim inicijalizirati trenutni prozor i oznaciti lijevi i desni rub --> vec ih imam
-                    //lijevi i desni stupac imam vec, samo me zanima sto je izmedu (da ne racunam dvaput)
-                    cv::Mat middle(*results.at(i), cv::Range(row - radius, row + radius + 1), cv::Range(radius + 1, radius + window)); //
-                    currentCost = (int)cv::sum(middle)[0] + leftCost + rightCost;
+                    //already have cost from left and right column
+                    cv::Mat middle(*results.at(i), cv::Range(row - radius, row + radius + 1), cv::Range(column - radius + 1, column + radius));
+                    // if(row == radius && column == radius) {
+                    //     cout << "middle column size: " << middle.size << endl;
+                    //     cout << middle << endl;
+                    // }
+                    int middleCost = (int)cv::sum(middle)[0];
+                    currentCost = middleCost + leftCost + rightCost;
                 }
                 else
                 {
-                    //inace dodaj cost od stupca koji je sad "dosao" - desni, a na kraju micem lijevi cost
+                    //otherwise just add right cost (left is subtracted at the end -> before assigning)
                     currentCost += rightCost;
                 }
-                if (currentCost < min_cost)
+                if (currentCost < minCost)
                 {
-                    min_cost = currentCost;
+                    minCost = currentCost;
                     minIndex = i;
                 }
                 currentCost -= leftCost;
+                previousCosts.at(i) = currentCost;
             }
             int disparity = d_min + minIndex;
             pOutput[column - radius] = disparity;
@@ -157,21 +165,23 @@ void StereoMatching::rollingWindowCost()
 }
 cv::Mat StereoMatching::getDisparityMap()
 {
+    preprocessImages();
     prepareCostPerDisparity();
     rollingWindowCost();
     return outputMap;
 }
 cv::Mat StereoMatching::censusTransform(const cv::Mat &matrix, int window)
 {
+    cv::Mat padded;
     int radius = (window - 1) / 2; // w=2*r+1
     cv::Mat temporary = cv::Mat::zeros(matrix.rows, matrix.cols, CV_8UC1);
-    cv::copyMakeBorder(matrix, matrix, radius, radius, radius, radius, cv::BORDER_CONSTANT, cv::Scalar(0));
-    // cout << "tu sam: " << matrix << endl;
+    cv::copyMakeBorder(matrix, padded, radius, radius, radius, radius, cv::BORDER_CONSTANT, cv::Scalar(0));
+
     uchar *p;
-    for (int row = radius; row < matrix.rows - radius; row++)
+    for (int row = radius; row < matrix.rows + radius; row++)
     {
         p = temporary.ptr<uchar>(row - radius);
-        for (int column = radius; column < matrix.cols - radius; column++)
+        for (int column = radius; column < matrix.cols + radius; column++)
         {
             int cost = 0;
             int potentialCost = 128;
@@ -182,7 +192,7 @@ cv::Mat StereoMatching::censusTransform(const cv::Mat &matrix, int window)
                     if (i == 0 && j == 0)
                         continue; // I want to skip the central pixel
 
-                    if (matrix.at<uchar>(row + i, column + j) > matrix.at<uchar>(row, column))
+                    if (padded.at<uchar>(row + i, column + j) > padded.at<uchar>(row, column))
                         cost += potentialCost;
                     potentialCost >>= 1; //divide by 2
                 }
@@ -243,16 +253,18 @@ int main(int argc, char **argv)
     {
         AbsoluteDifferenceCost absDiff = AbsoluteDifferenceCost();
         StereoMatching stereoMatching = StereoMatching(left, right, d_min, d_max, radius, absDiff);
-        stereoMatching.setNeedCensusTransform(1); //1=True
         cv::Mat output = stereoMatching.getDisparityMap();
         showImage(output, "output");
+        cout << output.size() << endl;
     }
     else if (cost == "census")
     {
         CensusCost census = CensusCost();
         StereoMatching stereoMatching = StereoMatching(left, right, d_min, d_max, radius, census);
+        stereoMatching.setNeedCensusTransform(1); //1=True
         cv::Mat output = stereoMatching.getDisparityMap();
         showImage(output, "output");
+        cout << output.size() << endl;
     }
     else
     {
@@ -266,76 +278,65 @@ int main(int argc, char **argv)
     // cout << output.size() << endl;
     // showImage(output, "output");
     //-----------------------------------------------------------------------------------------
-    // cv::Mat image1, image2, gray1, gray2;
-    // image1 = cv::imread(left);
-    // image2 = cv::imread(right);
-    // int columns = image1.cols;
-    // int rows = image1.rows;
-    // assert(image1.size == image2.size); //kasnije jos dodati malo teksta
+    // cv::Mat groundTruth = cv::imread("..//images//teddy//disp2.png", cv::IMREAD_GRAYSCALE);
+    // showImage(groundTruth, "ground truth");
+    // cout << groundTruth.size() << endl;
 
-    // cv::cvtColor(image1, gray1, cv::COLOR_BGR2GRAY);
-    // cv::cvtColor(image2, gray2, cv::COLOR_BGR2GRAY);
-
-    // if (!image1.data || !image2.data)
-    // {
-    //     printf("No image data \n");
-    //     return -1;
-    // }
-    // auto start = high_resolution_clock::now();
-    // auto stop = high_resolution_clock::now();
-    // auto duration = duration_cast<microseconds>(stop - start);
-    // auto tableInit = duration;
-
-    // int count = 0;
-    // uchar *p1, *p2, *p3;
-
-    // Get starting timepoint
-    // vector<unique_ptr<cv::Mat>> results;
-
-    // cout << "Average time taken: look-up-table "
-    //      << duration.count() * 1e-6 / (d_max - d_min) << " seconds" << endl;
-    // cout << "Total time taken (with init): look-up table " << (duration.count() + tableInit.count()) * 1e-6 << " seconds" << endl;
-
-    // cout << "count: " << count << " size: " << gray1.rows * gray1.cols * (d_max - d_min + 1) << endl;
-    //-------------------------------------------------------------------------------------------------------------------------------
-    // cout << results.at<int>(374, 449, 2) << endl
-    // cout << results.at<int>(3, 4, 0) << endl;
-    // cout << test.at<int>(150, 200) << endl;
-
-    // outputMap = results(cv::Range::all, cv::Range::all, 0);
-    // uchar *p = gray1.ptr<uchar>(2);
-    // cout << (int)p[3] << endl;
-    // cout << "gray1(450, 375): " << (int)gray1.ptr<uchar>(374)[449] << endl;
-    // cout << "gray2(450, 375): " << (int)gray2.ptr<uchar>(374)[449] << endl;
-    // cout << "results(450, 375):" << (int)results.at(0)->ptr<uchar>(374)[449] << endl;
-
-    // cout << "gray1(150, 300): " << (int)gray1.ptr<uchar>(150)[300] << endl;
-    // cout << "gray2(150, 298): " << (int)gray2.ptr<uchar>(150)[298] << endl;
-    // cout << "results(450, 375):" << (int)results.at(2)->ptr<uchar>(150)[300] << endl;
-    // cout << "Size: " << results.size() << endl;
-
-    // cout << results.size() << endl;
-    // cout << "result(450, 375):" << (int)results.at<int>(374, 449, 100) << endl; //(red, stupac, disparity)
-    // int disparityRange = d_max - d_min + 1;
-
-    // cv::Mat outputMap = cv::Mat::zeros(rows, columns, CV_8UC1);
-
-    // stop = high_resolution_clock::now();
-    // duration = duration_cast<microseconds>(stop - start);
-    // cout << "Total time taken to generate window cost and estimate output map: " << duration.count() * 1e-6 << " seconds" << endl;
-
-    // showImage(gray1, "gray1");
-    // showImage(gray2, "gray2");
-
-    // showImage(gray1, "gray1");
-    // showImage(gray2, "gray2");
-    // showImage(outputMap, "output");
     destroyWindows();
 
     // For small matrices you may use comma separated initializers:
-    // cv::Mat C = (cv::Mat_<uchar>(3, 3) << 124, 74, 32, 124, 64, 18, 157, 116, 84);
-    // cout << C << endl;
+    // cv::Mat C = (cv::Mat_<uchar>(3, 3) << 1, 2, 3, 4, 5, 6, 7, 8, 9);
+    // cv::Mat padded;
+    // cv::copyMakeBorder(C, padded, 2, 2, 2, 2, cv::BORDER_CONSTANT, cv::Scalar(0));
+    // cout << padded << endl;
+    // int currentCost = 0, leftCost, rightCost, previousCost;
+    // int minCost = 25 * 257;
+    // int count = 0;
+    // for (int i = 2; i < C.rows + 2; i++)
+    // {
+    //     for (int j = 2; j < C.cols + 2; j++)
+    //     {
+    //         count++;
+    //         currentCost = previousCost;
+    //         cv::Mat leftCol(padded, cv::Range(i - 2, i + 2 + 1), cv::Range(j - 2, j - 2 + 1));
+    //         cv::Mat rightCol(padded, cv::Range(i - 2, i + 2 + 1), cv::Range(j + 2, j + 2 + 1));
+    //         leftCost = (int)cv::sum(leftCol)[0];
+    //         rightCost = (int)cv::sum(rightCol)[0];
+    //         cout << "current left cost " << leftCost << endl;
+    //         cout << "Current left " << endl;
+    //         cout << leftCol << endl;
+    //         cout << "right cost " << rightCost << endl;
+    //         cout << "current right" << endl;
+    //         cout << rightCol << endl;
+
+    //         if (j == 2)
+    //         {
+    //             cv::Mat middle(padded, cv::Range(i - 2, i + 2 + 1), cv::Range(j - 2 + 1, j + 2));
+    //             cout << "Middle " << middle << endl;
+    //             int middleCost = (int)cv::sum(middle)[0];
+    //             currentCost = leftCost + rightCost + middleCost;
+    //         }
+    //         else
+    //         {
+    //             currentCost += rightCost;
+    //         }
+    //         if (currentCost < minCost)
+    //         {
+    //             minCost = currentCost;
+    //         }
+    //         cout << "current cost " << currentCost << endl;
+    //         currentCost -= leftCost;
+    //         previousCost = currentCost;
+    //     }
+    // }
+    // cout << minCost << endl;
+    // cout << "Count: " << count << endl;
     // cv::Mat census = censusTransform(C, 3);
     // cout << census << endl;
+    // AbsoluteDifferenceCost abs = AbsoluteDifferenceCost();
+    // CensusCost census = CensusCost();
+    // cout << abs.apply(5, 10) << " " << abs.apply(10, 5) << " " << abs.apply(255, 255) << endl;
+    // cout << census.apply(5, 10) << " " << census.apply(10, 5) << " " << census.apply(255, 255) << endl;
+    // cout << census.apply(125, 17) << " " << census.apply(187, 47) << " " << endl;
     return 0;
 }

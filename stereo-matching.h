@@ -6,6 +6,7 @@
 #include <boost/program_options.hpp>
 #include <bitset>
 #include <string>
+#include <array>
 
 class Cost
 {
@@ -17,20 +18,20 @@ public:
 class AbsoluteDifferenceCost : public Cost
 {
 
-private:
+public:
     int ADLookUpTable[256][256];
     int process(const int &x, const int &y) const;
-public:
+// public:
     AbsoluteDifferenceCost();
     int apply(const int &x, const int &y) const override;
 };
 
 class CensusCost : public Cost
 {
-private:
+public:
     int censusLookUpTable[256][256];
     int process(const int &x, const int &y) const;
-public:
+// public:
     CensusCost();
     int apply(const int &x, const int &y) const override;
 };
@@ -49,6 +50,7 @@ private:
     bool needCensusTransform = 0;
     void prepareCostPerDisparity();
     void rollingWindowCost();
+    void preprocessImages();
     cv::Mat censusTransform(const cv::Mat &matrix, int window);
 };
 
