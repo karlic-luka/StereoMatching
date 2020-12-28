@@ -275,68 +275,6 @@ int main(int argc, char **argv)
     auto duration = duration_cast<microseconds>(stop - start);
     cout << "Total time taken to generate output map: " << duration.count() * 1e-6 << " seconds" << endl;
 
-    // cout << output.size() << endl;
-    // showImage(output, "output");
-    //-----------------------------------------------------------------------------------------
-    // cv::Mat groundTruth = cv::imread("..//images//teddy//disp2.png", cv::IMREAD_GRAYSCALE);
-    // showImage(groundTruth, "ground truth");
-    // cout << groundTruth.size() << endl;
-
     destroyWindows();
-
-    // For small matrices you may use comma separated initializers:
-    // cv::Mat C = (cv::Mat_<uchar>(3, 3) << 1, 2, 3, 4, 5, 6, 7, 8, 9);
-    // cv::Mat padded;
-    // cv::copyMakeBorder(C, padded, 2, 2, 2, 2, cv::BORDER_CONSTANT, cv::Scalar(0));
-    // cout << padded << endl;
-    // int currentCost = 0, leftCost, rightCost, previousCost;
-    // int minCost = 25 * 257;
-    // int count = 0;
-    // for (int i = 2; i < C.rows + 2; i++)
-    // {
-    //     for (int j = 2; j < C.cols + 2; j++)
-    //     {
-    //         count++;
-    //         currentCost = previousCost;
-    //         cv::Mat leftCol(padded, cv::Range(i - 2, i + 2 + 1), cv::Range(j - 2, j - 2 + 1));
-    //         cv::Mat rightCol(padded, cv::Range(i - 2, i + 2 + 1), cv::Range(j + 2, j + 2 + 1));
-    //         leftCost = (int)cv::sum(leftCol)[0];
-    //         rightCost = (int)cv::sum(rightCol)[0];
-    //         cout << "current left cost " << leftCost << endl;
-    //         cout << "Current left " << endl;
-    //         cout << leftCol << endl;
-    //         cout << "right cost " << rightCost << endl;
-    //         cout << "current right" << endl;
-    //         cout << rightCol << endl;
-
-    //         if (j == 2)
-    //         {
-    //             cv::Mat middle(padded, cv::Range(i - 2, i + 2 + 1), cv::Range(j - 2 + 1, j + 2));
-    //             cout << "Middle " << middle << endl;
-    //             int middleCost = (int)cv::sum(middle)[0];
-    //             currentCost = leftCost + rightCost + middleCost;
-    //         }
-    //         else
-    //         {
-    //             currentCost += rightCost;
-    //         }
-    //         if (currentCost < minCost)
-    //         {
-    //             minCost = currentCost;
-    //         }
-    //         cout << "current cost " << currentCost << endl;
-    //         currentCost -= leftCost;
-    //         previousCost = currentCost;
-    //     }
-    // }
-    // cout << minCost << endl;
-    // cout << "Count: " << count << endl;
-    // cv::Mat census = censusTransform(C, 3);
-    // cout << census << endl;
-    // AbsoluteDifferenceCost abs = AbsoluteDifferenceCost();
-    // CensusCost census = CensusCost();
-    // cout << abs.apply(5, 10) << " " << abs.apply(10, 5) << " " << abs.apply(255, 255) << endl;
-    // cout << census.apply(5, 10) << " " << census.apply(10, 5) << " " << census.apply(255, 255) << endl;
-    // cout << census.apply(125, 17) << " " << census.apply(187, 47) << " " << endl;
     return 0;
 }
