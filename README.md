@@ -26,53 +26,64 @@ P.S. there's lots of fun algorithms which I could use to count "1"s bitwise (e.g
 
 
 ### COMPILE AND RUN
-***1)How to compile with cmake***
+***1) How to compile with cmake***
 
 Place yourself somewhere where you want to copy my repository
+```
 1. git clone https://github.com/karlic-luka/StereoMatching.git
 2. cd StereoMatching
 3. mkdir build
 4. cd build
 5. cmake ..
 6. cmake --build .
-
+```
 ***2) how to run the program***
 Once the program is compiled you can run it like this (if you're in the build directory)
+```
 ./stereo-matching -left=<path to left picture> -right=<path to right image> -d_min=<minimum disparity to evaluate> -d_max=<maximum disparity to evaluate> -window=<radius of a square window> -cost=<cost function>
+```
 
   
  All parameters except left and right are optional.
- You can also call ./stereo-matching with "help" "h" "usage" or "?".
+ You can also call 
+ ```
+ ./stereo-matching help 
+ ```
  
  P.S. I was using WSL2 Ubuntu 18.04 since I don't have Linux OS.
 
 ### PREDEFINED EXAMPLES
 In StereoMatching/images folder there are some pictures on which program can be evaluated.
 ###### a) CONES
+```
 a.1) ./stereo-matching -left=../images/cones/im2.png -right=../images/cones/im6.png  -cost="AD" -window=6 -d_min=20 -d_max=100
 a.2) ./stereo-matching -left=../images/cones/im2.png -right=../images/cones/im6.png  -cost="AD" -window=7 -d_min=20 -d_max=100
 a.3) ./stereo-matching -left=../images/cones/im2.png -right=../images/cones/im6.png  -cost="AD" -window=6 -d_min=10 -d_max=130
 a.4) ./stereo-matching -left=../images/cones/im2.png -right=../images/cones/im6.png  -cost="census" -window=3 -d_min=10 -d_max=80
 a.5) ./stereo-matching -left=../images/cones/im2.png -right=../images/cones/im6.png  -cost="census" -window=4 -d_min=10 -d_max=80
 a.6) ./stereo-matching -left=../images/cones/im2.png -right=../images/cones/im6.png  -cost="census" -window=8 -d_min=10 -d_max=120
-
+```
 ###### b) TEDDY
+```
 b.1) ./stereo-matching -left=../images/teddy/im2.png -right=../images/teddy/im6.png  -cost="AD" -window=4 -d_max=80
 b.2) ./stereo-matching -left=../images/teddy/im2.png -right=../images/teddy/im6.png  -cost="AD" -window=9 -d_max=80
 b.3) ./stereo-matching -left=../images/teddy/im2.png -right=../images/teddy/im6.png  -cost="AD" -window=11 -d_max=100
 b.4) ./stereo-matching -left=../images/teddy/im2.png -right=../images/teddy/im6.png  -cost="census" -window=9 -d_max=80
 b.5) ./stereo-matching -left=../images/teddy/im2.png -right=../images/teddy/im6.png  -cost="census" -window=11 -d_max=80
 b.6) ./stereo-matching -left=../images/teddy/im2.png -right=../images/teddy/im6.png  -cost="census" -window=11 -d_max=90
-
+```
 ###### c) TSUKUBA
+```
 c.1) ./stereo-matching -left=../images/tsukuba/scene1.row3.col1.ppm -right=../images/tsukuba/scene1.row3.col5.ppm  -cost="AD" -window=3 -d_min=10 -d_max=80
 c.2) ./stereo-matching -left=../images/tsukuba/scene1.row3.col1.ppm -right=../images/tsukuba/scene1.row3.col5.ppm  -cost="AD" -window=5 -d_min=10 -d_max=90
 c.3) ./stereo-matching -left=../images/tsukuba/scene1.row3.col1.ppm -right=../images/tsukuba/scene1.row3.col5.ppm  -cost="AD" -window=8 -d_min=10 -d_max=130
 c.4) ./stereo-matching -left=../images/tsukuba/scene1.row3.col1.ppm -right=../images/tsukuba/scene1.row3.col5.ppm  -cost="census" -window=11 -d_min=10 -d_max=80
-
+```
 ###### d) VENUS
+```
 d.1) ./stereo-matching -left=../images/venus/im0.ppm -right=../images/venus/im5.ppm  -cost="census" -window=11 -d_min=0 -d_max=80
 d.2) ./stereo-matching -left=../images/venus/im0.ppm -right=../images/venus/im5.ppm  -cost="AD" -window=11 -d_min=0 -d_max=80
 d.3) ./stereo-matching -left=../images/venus/im0.ppm -right=../images/venus/im5.ppm  -cost="AD" -window=13 -d_min=8 -d_max=80
-
-Almost all outputs from upper program calls are stored in StereoMatching/images/my-outputs
+```
+Almost all outputs from upper program calls are stored in StereoMatching/images/my-outputs.
+It is good to mention that my program is not parallelized using OpenCV and it is ran on CPU.
