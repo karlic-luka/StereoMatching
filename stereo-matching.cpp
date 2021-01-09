@@ -13,8 +13,8 @@ AbsoluteDifferenceCost::AbsoluteDifferenceCost() : Cost()
         for (int column = row; column < 256; column++)
         {
             int result = this->process(row, column);
-            this->ADLookUpTable[row][column] = result;
-            this->ADLookUpTable[column][row] = result;
+            this->lookUpTable[row][column] = result;
+            this->lookUpTable[column][row] = result;
         }
     }
 }
@@ -24,7 +24,7 @@ int AbsoluteDifferenceCost::process(const int &x, const int &y) const
 }
 int AbsoluteDifferenceCost::apply(const int &x, const int &y) const
 {
-    return this->ADLookUpTable[x][y];
+    return this->lookUpTable[x][y];
 }
 CensusCost::CensusCost() : Cost()
 {
@@ -34,8 +34,8 @@ CensusCost::CensusCost() : Cost()
         for (int column = row; column < 256; column++)
         {
             int result = this->process(row, column);
-            this->censusLookUpTable[row][column] = result;
-            this->censusLookUpTable[column][row] = result;
+            this->lookUpTable[row][column] = result;
+            this->lookUpTable[column][row] = result;
         }
     }
 }
@@ -48,7 +48,7 @@ int CensusCost::process(const int &x, const int &y) const
 }
 int CensusCost::apply(const int &x, const int &y) const
 {
-    return this->censusLookUpTable[x][y];
+    return this->lookUpTable[x][y];
 }
 void showImage(const cv::Mat &image, std::string windowName)
 {
