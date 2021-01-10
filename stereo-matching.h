@@ -23,8 +23,8 @@ public:
     virtual int apply(const int &x, const int &y) const = 0; //pure virtual function, derived class will implement it
 protected:
     /**
-     * Helper look-up table to apriori make all results of applying cost function to first 256 integers.
-     * It is symmetric matrix where (i, j) stores cost(i, j) 
+     * Helper look-up table to apriori compute all results of applying cost function to first 256 integers.
+     * It is a symmetric matrix where (i, j) stores cost(i, j) 
      */
     int lookUpTable[256][256];
 };

@@ -50,12 +50,12 @@ int CensusCost::apply(const int &x, const int &y) const
 {
     return this->lookUpTable[x][y];
 }
-void showImage(const cv::Mat &image, std::string windowName)
+void showImage(const cv::Mat &image, string windowName)
 {
     cv::namedWindow(windowName, cv::WINDOW_AUTOSIZE);
     cv::imshow(windowName, image);
 }
-StereoMatching::StereoMatching(std::string &left, std::string &right, int &d_min, int &d_max,
+StereoMatching::StereoMatching(string &left, string &right, int &d_min, int &d_max,
                                int &radius, Cost &cost) : d_min(d_min), d_max(d_max), radius(radius), cost(cost)
 {
     gray1 = cv::imread(left);
